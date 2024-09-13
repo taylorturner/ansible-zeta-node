@@ -1,0 +1,16 @@
+---
+# general settings
+ansible_connection: ssh
+ansible_user: ubuntu
+private_key: ~/.ssh/id_ed25519.pub
+
+# node settings
+chain_id: athens_7001-1
+force_jailing: false
+local_snapshot: true
+
+# metrics
+prometheus_metrics_port: 9001
+tendermint_metrics_port: 26660
+node_exporter_port: 9100
+otlp_endpoint: localhost:4317

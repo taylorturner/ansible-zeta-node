@@ -1,0 +1,15 @@
+shrimp genre seed mom climb local clap habit enemy taste hybrid fever salt object employ leopard diamond fitness basic alien army umbrella argue boring
+
+zetacored tx staking create-validator \
+  --amount=1000000000000000azeta \
+  --pubkey=$(zetacored tendermint show-validator) \
+  --moniker="TEST001" \
+  --chain-id=athens_7001-1 \
+  --commission-rate="0.10" \
+  --commission-max-rate="0.20" \
+  --commission-max-change-rate="0.01" \
+  --min-self-delegation="1000000" \
+  --gas=10000000 \
+  --gas-prices=10000000000azeta \
+  --gas-adjustment=1.15 \
+  --from=operator

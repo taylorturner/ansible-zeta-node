@@ -1,0 +1,179 @@
+---
+- name: Create a group for Prometheus
+  ansible.builtin.group:
+    name: prometheus
+    system: true
+
+- name: Create a user for Prometheus
+  ansible.builtin.user:
+    name: prometheus
+    system: true
+    group: prometheus
+    shell: /sbin/nologin
+
+- name: Create /etc dir
+  ansible.builtin.file:
+    state: directory
+    name: /etc/prometheus
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Create /var/lib dir
+  ansible.builtin.file:
+    state: directory
+    name: /var/lib/prometheus
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Create dir for prometheus
+  ansible.builtin.file:
+    state: directory
+    path: $HOME/prometheus
+    mode: '0750'
+
+- name: Download Prometheus
+  ansible.builtin.get_url:
+    url: https://github.com/prometheus/prometheus/releases/download/v2.53.2/prometheus-2.53.2.linux-arm64.tar.gz
+    dest: $HOME/prometheus.tar.gz
+    mode: '0644'
+
+- name: Extract tar
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: $HOME/prometheus.tar.gz
+    dest: $HOME/prometheus
+    extra_opts:
+      - "--strip-component=1"
+
+- name: Move prometheus binary
+  ansible.builtin.copy:
+    remote_src: true
+    src: $HOME/prometheus/prometheus
+    dest: /usr/local/bin/prometheus
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Move promtool binary
+  ansible.builtin.copy:
+    remote_src: true
+    src: $HOME/prometheus/promtool
+    dest: /usr/local/bin/promtool
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Move consoles files
+  ansible.builtin.copy:
+    remote_src: true
+    src: $HOME/prometheus/consoles
+    dest: /etc/prometheus
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Move config libraries
+  ansible.builtin.copy:
+    remote_src: true
+    src: $HOME/prometheus/console_libraries
+    dest: /etc/prometheus
+    mode: '0755'
+    owner: prometheus
+    group: prometheus
+
+- name: Create rules dir
+  ansible.builtin.file:
+    state: directory
+    path: /etc/prometheus/rules
+    mode: '0750'
+    owner: prometheus
+    group: prometheus
+
+- name: Create rules.d dir
+  ansible.builtin.file:
+    state: directory
+    path: /etc/prometheus/rules.d
+    mode: '0750'
+    owner: prometheus
+    group: prometheus
+
+- name: Create files_sd dir
+  ansible.builtin.file:
+    state: directory
+    path: /etc/prometheus/files_sd
+    mode: '0750'
+    owner: prometheus
+    group: prometheus
+
+- name: Chown /etc/prometheus
+  ansible.builtin.file:
+    path: /etc/prometheus
+    recurse: true
+    owner: prometheus
+    group: prometheus
+
+- name: Chown /var/lib/prometheus
+  ansible.builtin.file:
+    path: /var/lib/prometheus
+    recurse: true
+    owner: prometheus
+    group: prometheus
+
+- name: Create prometheus.service file
+  ansible.builtin.template:
+    src: prometheus.service
+    dest: /etc/systemd/system/prometheus.service
+    mode: '0644'
+  notify: restart prometheus
+
+- name: Allow access to prometheus web interface
+  community.general.ufw:
+    rule: allow
+    proto: tcp
+    port: '{{ prometheus_metrics_port }}'
+
+- name: Create dir for node_exporter
+  ansible.builtin.file:
+    state: directory
+    path: $HOME/node_exporter
+    mode: '0750'
+
+- name: Download node_exporter
+  ansible.builtin.get_url:
+    url: https://github.com/prometheus/node_exporter/releases/download/v1.8.2/node_exporter-1.8.2.linux-arm64.tar.gz
+    dest: $HOME/node_exporter.tar.gz
+    mode: '0644'
+
+- name: Extract tar
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: $HOME/node_exporter.tar.gz
+    dest: $HOME/node_exporter
+    extra_opts:
+      - "--strip-component=1"
+
+- name: Copy node_exporter binary
+  ansible.builtin.copy:
+    remote_src: true
+    src: $HOME/node_exporter/node_exporter
+    dest: /usr/local/bin/node_exporter
+    mode: '0755'
+  notify: restart node_exporter
+
+- name: Create node_exporter service file
+  ansible.builtin.template:
+    src: node_exporter.service
+    dest: /etc/systemd/system/node_exporter.service
+    mode: '0644'
+  notify: restart node_exporter
+
+- name: Copy prometheus config
+  ansible.builtin.template:
+    src: prometheus.yml
+    dest: /etc/prometheus/prometheus.yml
+    mode: '0640'
+    owner: prometheus
+    group: prometheus
+  notify: restart prometheus

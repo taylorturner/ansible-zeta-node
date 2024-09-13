@@ -1,0 +1,24 @@
+---
+- name: Pause for 5 seconds
+  ansible.builtin.pause:
+    seconds: 5
+  listen: "check status"
+
+- name: Get validator status
+  ansible.builtin.command:
+    cmd: zetacored query staking validator {{ operator_key.stdout }}
+  register: validator_status
+  listen: "check status"
+
+- name: Check if validator is jailed or bonded
+  set_fact:
+    is_jailed: "{{ 'jailed: true' in validator_status.stdout }}"
+    is_unbonded: "{{ 'status: BOND_STATUS_UNBONDING' in validator_status.stdout }}"
+  listen: "check status"
+
+- name: Print status
+  debug:
+    msg:
+      - "Validator is jailed: {{ is_jailed }}"
+      - "Validator is unbonded: {{ is_unbonded }}"
+  listen: "check status"

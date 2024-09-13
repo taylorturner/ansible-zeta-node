@@ -1,0 +1,23 @@
+[Unit]
+Description=zetacored (running under cosmovisor)
+After=multi-user.target
+StartLimitIntervalSec=0
+[Install]
+WantedBy=multi-user.target
+[Service]
+WorkingDirectory=/home/zetachain/.zetacored/cosmovisor
+Environment="DAEMON_HOME=/home/zetachain/.zetacored"
+Environment="DAEMON_NAME=zetacored"
+Environment="DAEMON_ALLOW_DOWNLOAD_BINARIES=true"
+Environment="DAEMON_RESTART_AFTER_UPGRADE=true"
+Environment="DAEMON_DATA_BACKUP_DIR=/home/zetachain/.zetacored"
+Environment="CLIENT_DAEMON_NAME=zetaclientd"
+Environment="CLIENT_SKIP_UPGRADE=false"
+Environment="CLIENT_START_PROCESS=false"
+Environment="UNSAFE_SKIP_BACKUP=true"
+Type=simple
+Restart=always
+RestartSec=600
+User=zetachain
+LimitNOFILE=262144
+ExecStart=cosmovisor run start --home /home/zetachain/.zetacored/ --log_format json  --moniker {{node_name}}

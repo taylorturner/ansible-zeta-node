@@ -1,0 +1,14 @@
+---
+- name: restart prometheus
+  ansible.builtin.systemd_service:
+    state: restarted
+    enabled: true
+    daemon_reload: true
+    name: prometheus
+
+- name: restart node_exporter
+  ansible.builtin.systemd_service:
+    state: restarted
+    enabled: true
+    daemon_reload: true
+    name: node_exporter

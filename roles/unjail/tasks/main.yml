@@ -1,0 +1,62 @@
+---
+- name: Get operator key
+  ansible.builtin.command:
+    cmd: zetacored keys show operator --bech val -a --home /home/zetachain/.zetacored
+  register: operator_key
+
+- name: Get validator status
+  ansible.builtin.command:
+    cmd: zetacored query staking validator {{ operator_key.stdout }}
+  register: validator_status
+
+- name: Check if validator is jailed or bonded
+  ansible.builtin.set_fact:
+    is_jailed: "{{ 'jailed: true' in validator_status.stdout }}"
+    is_unbonded: "{{ 'status: BOND_STATUS_UNBONDING' in validator_status.stdout }}"
+
+- name: Print status
+  ansible.builtin.debug:
+    msg:
+      - "Validator is jailed: {{ is_jailed }}"
+      - "Validator is unbonded: {{ is_unbonded }}"
+
+# TODO: Check if tokens need to be delegated
+- name: Delegate tokens
+  ansible.builtin.command:
+    cmd: >
+      zetacored tx staking delegate {{ operator_key.stdout }}
+      1zeta --from operator
+      --gas=10000000 --gas-prices=10000000000azeta
+      --home /home/zetachain/.zetacored --yes
+  when: is_jailed
+
+- name: Unjail validator
+  ansible.builtin.command:
+    cmd: >
+      zetacored tx slashing unjail
+      --from=operator
+      --gas=10000000
+      --gas-prices=10000000000azeta
+      --home /home/zetachain/.zetacored
+      --yes
+  when: is_jailed
+
+- name: Pause for 5 seconds
+  ansible.builtin.pause:
+    seconds: 5
+
+- name: Get validator status
+  ansible.builtin.command:
+    cmd: zetacored query staking validator {{ operator_key.stdout }}
+  register: validator_status
+
+- name: Check if validator is jailed or bonded
+  ansible.builtin.set_fact:
+    is_jailed: "{{ 'jailed: true' in validator_status.stdout }}"
+    is_unbonded: "{{ 'status: BOND_STATUS_UNBONDING' in validator_status.stdout }}"
+
+- name: Print status
+  ansible.builtin.debug:
+    msg:
+      - "Validator is jailed: {{ is_jailed }}"
+      - "Validator is unbonded: {{ is_unbonded }}"

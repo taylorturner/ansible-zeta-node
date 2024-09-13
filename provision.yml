@@ -1,0 +1,16 @@
+---
+
+- name: Configure Validator Nodes
+  hosts: nodes
+  become: true
+
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+    - role: common
+      tags: common
+    - role: prometheus
+      tags: monitoring, prometheus
+    - role: grafana
+      tags: monitoring, grafana

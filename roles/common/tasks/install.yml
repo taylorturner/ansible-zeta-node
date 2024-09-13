@@ -1,0 +1,245 @@
+---
+- name: Create admin user group
+  ansible.builtin.group:
+    name: admins
+    state: present
+
+- name: Create admins sudoers file
+  ansible.builtin.template:
+    src: admins-sudoers
+    dest: /etc/sudoers.d/admins
+    mode: '0440'
+
+- name: Create a user 'zetachain' with a home directory
+  ansible.builtin.user:
+    name: zetachain
+    create_home: true
+    shell: /bin/bash
+    groups: admins
+
+- name: Create .ssh dir
+  ansible.builtin.file:
+    state: directory
+    path: /home/zetachain/.ssh
+    owner: zetachain
+    group: zetachain
+    mode: '0700'
+
+- name: Copy authorized_keys to zetachain user
+  ansible.builtin.copy:
+    remote_src: true
+    src: /home/ubuntu/.ssh/authorized_keys
+    dest: /home/zetachain/.ssh/authorized_keys
+    owner: zetachain
+    group: zetachain
+    mode: '0600'
+
+- name: Check if zetacored has already been initialzed
+  ansible.builtin.stat:
+    path: /home/zetachain/.zetacored
+  register: zetacored_path
+
+# TODO: make version, platform a variable
+- name: Download ZetaChain node binary
+  ansible.builtin.get_url:
+    url: https://github.com/zeta-chain/node/releases/download/v19.2.2/zetacored-linux-arm64
+    dest: /usr/local/bin/zetacored
+    mode: '0755'
+  when: not zetacored_path.stat.exists
+
+- name: Make the ZetaChain binary executable
+  ansible.builtin.file:
+    path: /usr/local/bin/zetacored
+    mode: '0755'
+  when: not zetacored_path.stat.exists
+
+# TODO: add var for node_name
+- name: Initialize the data dir from /home/zetachain if needed
+  ansible.builtin.command:
+    cmd: zetacored init {{ node_name }} --chain-id {{ chain_id }} --home /home/zetachain/.zetacored
+    creates: /home/zetachain/.zetacored
+  when: not zetacored_path.stat.exists
+
+- name: Check if zetacored was successfully initialized
+  ansible.builtin.stat:
+    path: /home/zetachain/.zetacored
+  register: zetacored_path
+  failed_when: not zetacored_path.stat.exists
+
+- name: Create zetachain user directory structure
+  ansible.builtin.file:
+    path: /home/zetachain/.zetacored/config
+    state: directory
+    owner: zetachain
+    group: zetachain
+    mode: '0755'
+
+# TODO: use var for 'mainnet' or 'testnet' ('athens3')
+- name: Download genesis.json
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/zeta-chain/network-config/main/athens3/genesis.json
+    dest: /home/zetachain/.zetacored/config/genesis.json
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+
+- name: Download client.toml
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/zeta-chain/network-config/main/athens3/client.toml
+    dest: /home/zetachain/.zetacored/config/client.toml
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+
+- name: Download config.toml
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/zeta-chain/network-config/main/athens3/config.toml
+    dest: /home/zetachain/.zetacored/config/config.toml
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+
+- name: Download app.toml
+  ansible.builtin.get_url:
+    url: https://raw.githubusercontent.com/zeta-chain/network-config/main/athens3/app.toml
+    dest: /home/zetachain/.zetacored/config/app.toml
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+
+- name: Update config.toml with node_name
+  ansible.builtin.replace:
+    path: /home/zetachain/.zetacored/config/config.toml
+    regexp: 'moniker = "{MONIKER}"'
+    replace: 'moniker = "{{ node_name }}"'
+
+- name: Store external IP as a var, fail if empty
+  ansible.builtin.shell:
+    cmd: curl ifconfig.me
+  register: external_ip
+  failed_when: external_ip.stdout == ""
+
+- name: Update config.toml with external IP
+  ansible.builtin.replace:
+    path: /home/zetachain/.zetacored/config/config.toml
+    regexp: 'external_address = "{YOUR_EXTERNAL_IP_ADDRESS_HERE}:26656"'
+    replace: 'external_address = "{{ external_ip.stdout }}:26656"'
+
+- name: Copy limits.conf template
+  ansible.builtin.template:
+    src: limits.conf
+    dest: /etc/security/limits.conf
+    mode: '0644'
+
+- name: Add line to sysctl.conf
+  ansible.builtin.lineinfile:
+    dest: /etc/sysctl.conf
+    line: 'fs.file-max=262144'
+
+- name: Check if cosmovisor is installed
+  ansible.builtin.stat:
+    path: /usr/local/bin/cosmovisor
+  register: cosmovisor_path
+
+- name: Download cosmovisor precompiled binaries
+  ansible.builtin.get_url:
+    url: https://github.com/cosmos/cosmos-sdk/releases/download/cosmovisor%2Fv1.5.0/cosmovisor-v1.5.0-linux-arm64.tar.gz
+    dest: /home/zetachain/cosmovisor.tar.gz
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+
+- name: Extract tarball
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: /home/zetachain/cosmovisor.tar.gz
+    dest: /home/zetachain
+    owner: zetachain
+    group: zetachain
+
+- name: Move cosmovisor binary into path
+  ansible.builtin.copy:
+    remote_src: true
+    src: /home/zetachain/cosmovisor
+    dest: /usr/local/bin/cosmovisor
+    mode: '0755'
+
+- name: Create cosmovisor bin directory
+  ansible.builtin.file:
+    path: /home/zetachain/.zetacored/cosmovisor/genesis/bin
+    state: directory
+    mode: '0755'
+
+- name: Create cosmovisor upgrades directory
+  ansible.builtin.file:
+    path: /home/zetachain/.zetacored/cosmovisor/upgrades
+    state: directory
+    mode: '0755'
+
+- name: Copy zetacored binary to cosmovisor dir
+  ansible.builtin.copy:
+    remote_src: true
+    src: /usr/local/bin/zetacored
+    dest: /home/zetachain/.zetacored/cosmovisor/genesis/bin/zetacored
+    mode: '0755'
+
+- name: Make sure all files are owned by zetachain user
+  ansible.builtin.file:
+    path: /home/zetachain
+    recurse: true
+    owner: zetachain
+    group: zetachain
+
+# TODO: Setup reloading and validating binaries to prevent upgrade issues
+- name: Configure systemd unit file
+  ansible.builtin.template:
+    src: zetacored.service
+    dest: /etc/systemd/system/zetacored.service
+    mode: '0644'
+  notify: restart zetacored
+
+# TODO: Put behind a variable 'monitoring=true'
+- name: Update config.toml with Prometheus metrics
+  ansible.builtin.replace:
+    path: /home/zetachain/.zetacored/config/config.toml
+    regexp: 'prometheus = false'
+    replace: 'prometheus = true'
+  notify: restart zetacored
+
+- name: Download zetacored snapshot
+  ansible.builtin.get_url:
+    url: https://testnet-fullnode.snapshots.zetachain.com/fullnode-snapshot-v19-H6711488-2024-09-09_22-26.tar
+    dest: /home/zetachain/snapshot-v19.tar
+    timeout: 60
+    owner: zetachain
+    group: zetachain
+    mode: '0664'
+  register: snapshot_download
+  when: not local_snapshot
+
+- name: Copy zetacored snapshot from local
+  ansible.builtin.copy:
+    src: snapshot-v19.tar
+    dest: /home/zetachain/snapshot-v19.tar
+    owner: zetachain
+    group: zetachain
+    mode: '0644'
+  register: snapshot_download
+  when: local_snapshot
+
+- name: Extract tarball
+  ansible.builtin.unarchive:
+    remote_src: true
+    src: /home/zetachain/snapshot-v19.tar
+    dest: /home/zetachain/.zetacored
+    owner: zetachain
+    group: zetachain
+  notify: restart zetacored
+  when: snapshot_download is changed
+
+- name: Restart and enable service zetacored, also issue daemon-reload to pick up config changes
+  ansible.builtin.systemd_service:
+    state: restarted
+    enabled: true
+    daemon_reload: true
+    name: zetacored

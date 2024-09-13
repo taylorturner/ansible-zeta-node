@@ -1,0 +1,16 @@
+---
+
+- name: Manage Validator Nodes
+  hosts: validator_nodes
+  become: true
+
+  vars_files:
+    - group_vars/all.yml
+
+  roles:
+    - role: unjail
+      tags: unjail
+      when: not force_jailing
+    - role: jail
+      tags: jail
+      when: force_jailing

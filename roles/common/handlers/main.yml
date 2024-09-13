@@ -1,0 +1,7 @@
+---
+- name: restart zetacored
+  ansible.builtin.systemd_service:
+    state: restarted
+    enabled: true
+    daemon_reload: true
+    name: zetacored
