@@ -1,4 +1,4 @@
-# zetachain_project
+# ansible-zeta-node
 This repo contains an Ansible playbook for configuring a ZetaChain RPC node and Prometheus/Grafana for monitoring. Additionally there is a playbook for automating the process of jailing/unjailing a validator node.
 
 Grafana: http://localhost:3000
